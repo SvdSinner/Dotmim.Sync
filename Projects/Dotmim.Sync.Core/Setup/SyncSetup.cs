@@ -35,13 +35,13 @@ namespace Dotmim.Sync
         public string StoredProceduresSuffix { get; set; }
 
         /// <summary>
-        /// Specify a prefix for naming stored procedure. Default is empty string
+        /// Specify a prefix for naming triggers. Default is empty string
         /// </summary>
         [DataMember(Name = "tf", IsRequired = false, EmitDefaultValue = false, Order = 5)]
         public string TriggersPrefix { get; set; }
 
         /// <summary>
-        /// Specify a suffix for naming stored procedures. Default is empty string
+        /// Specify a suffix for naming triggers. Default is empty string
         /// </summary>
         [DataMember(Name = "ts", IsRequired = false, EmitDefaultValue = false, Order = 6)]
         public string TriggersSuffix { get; set; }
@@ -57,6 +57,13 @@ namespace Dotmim.Sync
         /// </summary>
         [DataMember(Name = "tts", IsRequired = false, EmitDefaultValue = false, Order = 8)]
         public string TrackingTablesSuffix { get; set; }
+
+        /// <summary>
+        /// Specify a schema to keep all stored procedures and tables in. Default is empty string which keeps things in the same schema as the tables they relate to.
+        /// </summary>
+        /// <remarks>Schema must be created before running.  Auto-creation might be implimented later.</remarks>
+        [DataMember(Name = "sch", IsRequired = false, EmitDefaultValue = false, Order = 9)]
+        public string DistinctSchema { get; set; } //TODO: Create schema if it does not exist.
 
         /// <summary>
         /// Create a list of tables to be added to the sync process

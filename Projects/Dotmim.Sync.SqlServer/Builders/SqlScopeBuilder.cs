@@ -33,23 +33,32 @@ namespace Dotmim.Sync.SqlServer.Scope
             return command;
         }
 
+        protected string GetScopeInfoTableName => ScopeInfoTableName.Unquoted().Normalized().ObjectName;
+        protected string GetScopeInfoClientTableName => ScopeInfoTableName.Unquoted().Normalized().ObjectName + "_client";
+        protected string GetScopeInfoSchema => ScopeInfoTableName.Unquoted().Normalized().SchemaName;
         //Exists Scope Table
         // ------------------------------
         public override DbCommand GetExistsScopeInfoTableCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = this.ScopeInfoTableName.Unquoted().Normalized().ToString();
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = $@"IF EXISTS (SELECT t.name FROM sys.tables t WHERE t.name = N'{tableName}') SELECT 1 ELSE SELECT 0";
+            command.CommandText = string.IsNullOrWhiteSpace(schemaName) ?
+                $@"IF EXISTS (SELECT t.name FROM sys.tables t WHERE t.name = N'{tableName}') SELECT 1 ELSE SELECT 0" 
+                : $@"IF EXISTS (SELECT t.name FROM sys.tables t INNER JOIN sys.schemas s ON t.schema_id = t.schema_id WHERE t.name = N'{tableName}' AND s.name = N'{schemaName}') SELECT 1 ELSE SELECT 0";
             return command;
         }
 
         public override DbCommand GetExistsScopeInfoClientTableCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}_client";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoClientTableName;
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = $@"IF EXISTS (SELECT t.name FROM sys.tables t WHERE t.name = N'{tableName}') SELECT 1 ELSE SELECT 0";
+            command.CommandText = string.IsNullOrWhiteSpace(schemaName) ?
+                $@"IF EXISTS (SELECT t.name FROM sys.tables t WHERE t.name = N'{tableName}') SELECT 1 ELSE SELECT 0"
+                : $@"IF EXISTS (SELECT t.name FROM sys.tables t INNER JOIN sys.schemas s ON t.schema_id = t.schema_id WHERE t.name = N'{tableName}' AND s.name = N'{schemaName}') SELECT 1 ELSE SELECT 0";
             return command;
         }
 
@@ -61,10 +70,11 @@ namespace Dotmim.Sync.SqlServer.Scope
         
         public override DbCommand GetCreateScopeInfoTableCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
 
             var commandText =
-                $@"CREATE TABLE [dbo].[{tableName}] (
+                $@"CREATE TABLE [{(string.IsNullOrWhiteSpace(schemaName)?"dbo": schemaName)}].[{tableName}] (
                     [sync_scope_name] [nvarchar](100) NOT NULL,
                     [sync_scope_schema] [nvarchar](max) NULL,
                     [sync_scope_setup] [nvarchar](max) NULL,
@@ -82,10 +92,11 @@ namespace Dotmim.Sync.SqlServer.Scope
         }
         public override DbCommand GetCreateScopeInfoClientTableCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}_client";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoClientTableName;
 
             var commandText =
-                $@"CREATE TABLE [dbo].[{tableName}](
+                $@"CREATE TABLE [{(string.IsNullOrWhiteSpace(schemaName) ? "dbo" : schemaName)}].[{tableName}](
                     [sync_scope_id] [uniqueidentifier] NOT NULL,
                     [sync_scope_name] [nvarchar](100) NOT NULL,
                     [sync_scope_hash] [nvarchar](100) NOT NULL,
@@ -112,7 +123,8 @@ namespace Dotmim.Sync.SqlServer.Scope
         // ------------------------------
         public override DbCommand GetAllScopeInfosCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = this.ScopeInfoTableName.Unquoted().Normalized().ToString();
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
 
             var commandText =
                 $@"SELECT [sync_scope_name], 
@@ -121,7 +133,7 @@ namespace Dotmim.Sync.SqlServer.Scope
                           [sync_scope_version],
                           [sync_scope_last_clean_timestamp],
                           [sync_scope_properties]
-                    FROM  {tableName}";
+                    FROM  {(string.IsNullOrWhiteSpace(schemaName)? "":$"[{schemaName}].")}{tableName}";
 
             var command = connection.CreateCommand();
             command.Transaction = transaction;
@@ -132,7 +144,8 @@ namespace Dotmim.Sync.SqlServer.Scope
         
         public override DbCommand GetAllScopeInfoClientsCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}_client";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoClientTableName;
             var commandText =
                 $@"SELECT  [sync_scope_id]
                          , [sync_scope_name]
@@ -144,8 +157,7 @@ namespace Dotmim.Sync.SqlServer.Scope
                          , [scope_last_sync]
                          , [sync_scope_errors]
                          , [sync_scope_properties]
-                    FROM  [{tableName}]";
-
+                    FROM  {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}]";
 
             var command = connection.CreateCommand();
             command.Transaction = transaction;
@@ -161,7 +173,8 @@ namespace Dotmim.Sync.SqlServer.Scope
         // ------------------------------
         public override DbCommand GetScopeInfoCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = this.ScopeInfoTableName.Unquoted().Normalized().ToString();
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
 
             var commandText =
                     $@"SELECT [sync_scope_name], 
@@ -170,7 +183,7 @@ namespace Dotmim.Sync.SqlServer.Scope
                           [sync_scope_version],
                           [sync_scope_last_clean_timestamp],
                           [sync_scope_properties]
-                    FROM  [{tableName}]
+                    FROM  {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}]
                     WHERE [sync_scope_name] = @sync_scope_name" ;
 
             var command = connection.CreateCommand();
@@ -188,7 +201,8 @@ namespace Dotmim.Sync.SqlServer.Scope
        
         public override DbCommand GetScopeInfoClientCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}_client";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoClientTableName;
             var commandText =
                 $@"SELECT    [sync_scope_id]
                            , [sync_scope_name]
@@ -200,7 +214,7 @@ namespace Dotmim.Sync.SqlServer.Scope
                            , [scope_last_sync]
                            , [sync_scope_errors]
                            , [sync_scope_properties]
-                    FROM  [{tableName}]
+                    FROM  {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}]
                     WHERE [sync_scope_name] = @sync_scope_name and [sync_scope_id] = @sync_scope_id and [sync_scope_hash] = @sync_scope_hash";
 
 
@@ -244,10 +258,11 @@ namespace Dotmim.Sync.SqlServer.Scope
         // ------------------------------
         public override DbCommand GetUpdateScopeInfoCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = this.ScopeInfoTableName.Unquoted().Normalized().ToString();
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
 
             var commandText = $@"
-                    MERGE [{tableName}] AS [base] 
+                    MERGE {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}] AS [base] 
                     USING (
                                SELECT  @sync_scope_name AS sync_scope_name,  
 	                                   @sync_scope_schema AS sync_scope_schema,  
@@ -321,10 +336,11 @@ namespace Dotmim.Sync.SqlServer.Scope
       
         public override DbCommand GetUpdateScopeInfoClientCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}_client";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoClientTableName;
 
             var commandText = $@"
-                    MERGE [{tableName}] AS [base] 
+                    MERGE {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}] AS [base] 
                     USING (
                                SELECT  @sync_scope_id AS sync_scope_id,  
 	                                   @sync_scope_name AS sync_scope_name,  
@@ -430,9 +446,10 @@ namespace Dotmim.Sync.SqlServer.Scope
         // ------------------------------
         public override DbCommand GetDeleteScopeInfoCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = this.ScopeInfoTableName.Unquoted().Normalized().ToString();
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
 
-            var commandText = $@"DELETE FROM [{tableName}] WHERE [sync_scope_name] = @sync_scope_name";
+            var commandText = $@"DELETE FROM {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}] WHERE [sync_scope_name] = @sync_scope_name";
 
             var command = connection.CreateCommand();
             command.Transaction = transaction;
@@ -450,9 +467,10 @@ namespace Dotmim.Sync.SqlServer.Scope
       
         public override DbCommand GetDeleteScopeInfoClientCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}_client";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoClientTableName;
             var commandText =
-                $@"DELETE FROM  [{tableName}]
+                $@"DELETE FROM  {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}]
                    WHERE [sync_scope_name] = @sync_scope_name and [sync_scope_id] = @sync_scope_id and [sync_scope_hash] = @sync_scope_hash";
 
 
@@ -490,19 +508,21 @@ namespace Dotmim.Sync.SqlServer.Scope
         // ------------------------------
         public override DbCommand GetDropScopeInfoTableCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = this.ScopeInfoTableName.Unquoted().Normalized().ToString();
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = $"DROP Table [dbo].[{tableName}]";
+            command.CommandText = $"DROP Table {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}]";
             return command;
         }
 
         public override DbCommand GetDropScopeInfoClientTableCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}_client";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoClientTableName;
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = $"DROP Table [dbo].[{tableName}]";
+            command.CommandText = $"DROP Table {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}]";
             return command;
         }
         // ------------------------------
@@ -515,9 +535,10 @@ namespace Dotmim.Sync.SqlServer.Scope
 
             command.Transaction = transaction;
 
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
 
-            command.CommandText = $@"Select count(*) from [{tableName}] where sync_scope_name = @sync_scope_name;";
+            command.CommandText = $@"Select count(*) from {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}] where sync_scope_name = @sync_scope_name;";
 
             var p1 = command.CreateParameter();
             p1.ParameterName = "@sync_scope_name";
@@ -535,9 +556,10 @@ namespace Dotmim.Sync.SqlServer.Scope
 
             command.Transaction = transaction;
 
-            var tableName = $"{this.ScopeInfoTableName.Unquoted().Normalized().ToString()}_client";
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoClientTableName;
 
-            command.CommandText = $@"Select count(*) from [{tableName}] 
+            command.CommandText = $@"Select count(*) from {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}] 
                                      where sync_scope_id = @sync_scope_id 
                                      and sync_scope_name = @sync_scope_name
                                      and sync_scope_hash = @sync_scope_hash;";

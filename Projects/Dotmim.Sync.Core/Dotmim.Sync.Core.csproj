@@ -29,9 +29,7 @@
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 
 	</PropertyGroup>
-	<PropertyGroup>
-		<AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
-	</PropertyGroup>
+
 	<!--generate NUGET package including symbols ans source on each release build -->
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -84,7 +82,7 @@
 
 
 	<ItemGroup>
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
 	</ItemGroup>
 

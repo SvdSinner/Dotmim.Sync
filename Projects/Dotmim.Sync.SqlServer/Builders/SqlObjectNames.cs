@@ -133,6 +133,7 @@ namespace Dotmim.Sync.SqlServer.Builders
             var suf = this.Setup?.StoredProceduresSuffix;
             var tpref = this.Setup?.TriggersPrefix;
             var tsuf = this.Setup?.TriggersSuffix;
+            var distinctSchema = this.Setup?.DistinctSchema;
 
             var tableName = ParserName.Parse(TableDescription);
 
@@ -143,25 +144,25 @@ namespace Dotmim.Sync.SqlServer.Builders
             var storedProcedureName = $"{pref}{tableName.Unquoted().Normalized().ToString()}{suf}_";
             var triggerName = $"{tpref}{tableName.Unquoted().Normalized().ToString()}{tsuf}_";
 
-            this.AddStoredProcedureName(DbStoredProcedureType.SelectChanges, string.Format(selectChangesProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
-            this.AddStoredProcedureName(DbStoredProcedureType.SelectChangesWithFilters, string.Format(selectChangesProcNameWithFilters, schema, storedProcedureName, scopeNameWithoutDefaultScope, "{0}_"));
+            this.AddStoredProcedureName(DbStoredProcedureType.SelectChanges, GenerateProcedureName(selectChangesProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
+            this.AddStoredProcedureName(DbStoredProcedureType.SelectChangesWithFilters, GenerateProcedureName(selectChangesProcNameWithFilters, schema, storedProcedureName, scopeNameWithoutDefaultScope, "{0}_", distinctSchema));
 
-            this.AddStoredProcedureName(DbStoredProcedureType.SelectInitializedChanges, string.Format(initializeChangesProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
-            this.AddStoredProcedureName(DbStoredProcedureType.SelectInitializedChangesWithFilters, string.Format(initializeChangesProcNameWithFilters, schema, storedProcedureName, scopeNameWithoutDefaultScope, "{0}_"));
+            this.AddStoredProcedureName(DbStoredProcedureType.SelectInitializedChanges, GenerateProcedureName(initializeChangesProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
+            this.AddStoredProcedureName(DbStoredProcedureType.SelectInitializedChangesWithFilters, GenerateProcedureName(initializeChangesProcNameWithFilters, schema, storedProcedureName, scopeNameWithoutDefaultScope, "{0}_", distinctSchema));
 
-            this.AddStoredProcedureName(DbStoredProcedureType.SelectRow, string.Format(selectRowProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
-            this.AddStoredProcedureName(DbStoredProcedureType.UpdateRow, string.Format(updateProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
-            this.AddStoredProcedureName(DbStoredProcedureType.DeleteRow, string.Format(deleteProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
-            this.AddStoredProcedureName(DbStoredProcedureType.DeleteMetadata, string.Format(deleteMetadataProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
-            this.AddStoredProcedureName(DbStoredProcedureType.Reset, string.Format(resetMetadataProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
+            this.AddStoredProcedureName(DbStoredProcedureType.SelectRow, GenerateProcedureName(selectRowProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
+            this.AddStoredProcedureName(DbStoredProcedureType.UpdateRow, GenerateProcedureName(updateProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
+            this.AddStoredProcedureName(DbStoredProcedureType.DeleteRow, GenerateProcedureName(deleteProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
+            this.AddStoredProcedureName(DbStoredProcedureType.DeleteMetadata, GenerateProcedureName(deleteMetadataProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
+            this.AddStoredProcedureName(DbStoredProcedureType.Reset, GenerateProcedureName(resetMetadataProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
 
             this.AddTriggerName(DbTriggerType.Insert, string.Format(insertTriggerName, schema, triggerName));
             this.AddTriggerName(DbTriggerType.Update, string.Format(updateTriggerName, schema, triggerName));
             this.AddTriggerName(DbTriggerType.Delete, string.Format(deleteTriggerName, schema, triggerName));
 
-            this.AddStoredProcedureName(DbStoredProcedureType.BulkTableType, string.Format(bulkTableTypeName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
-            this.AddStoredProcedureName(DbStoredProcedureType.BulkUpdateRows, string.Format(bulkUpdateProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
-            this.AddStoredProcedureName(DbStoredProcedureType.BulkDeleteRows, string.Format(bulkDeleteProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope));
+            this.AddStoredProcedureName(DbStoredProcedureType.BulkTableType, GenerateProcedureName(bulkTableTypeName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
+            this.AddStoredProcedureName(DbStoredProcedureType.BulkUpdateRows, GenerateProcedureName(bulkUpdateProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
+            this.AddStoredProcedureName(DbStoredProcedureType.BulkDeleteRows, GenerateProcedureName(bulkDeleteProcName, schema, storedProcedureName, scopeNameWithoutDefaultScope, "", distinctSchema));
 
             this.AddCommandName(DbCommandType.DisableConstraints, string.Format(disableConstraintsText, ParserName.Parse(TableDescription).Schema().Quoted().ToString()));
             this.AddCommandName(DbCommandType.EnableConstraints, string.Format(enableConstraintsText, ParserName.Parse(TableDescription).Schema().Quoted().ToString()));
@@ -172,6 +173,14 @@ namespace Dotmim.Sync.SqlServer.Builders
             this.AddCommandName(DbCommandType.SelectRow, CreateSelectRowCommand());
             this.AddCommandName(DbCommandType.Reset, CreateResetCommand());
 
+        }
+
+        private string GenerateProcedureName(string format, string schema, string storedProcedureName, string scopeNameWithoutDefaultScope, string withFilters = "", string distinctSchema = "")
+        {
+            if (string.IsNullOrEmpty(distinctSchema)) 
+                return string.Format(format, schema, storedProcedureName, scopeNameWithoutDefaultScope, withFilters);
+            var distinctSchemaFormat = format.Replace("[{0}].[", "[{4}].[{0}");
+            return string.Format(distinctSchemaFormat, schema, storedProcedureName, scopeNameWithoutDefaultScope, withFilters, distinctSchema);
         }
 
         private string CreateSelectMetadataCommand()

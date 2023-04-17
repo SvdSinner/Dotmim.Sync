@@ -26,7 +26,8 @@ namespace Dotmim.Sync.SqlServer.ChangeTracking.Builders
 
         public override DbCommand GetUpdateScopeInfoCommand(DbConnection connection, DbTransaction transaction)
         {
-            var tableName = this.ScopeInfoTableName.Unquoted().Normalized().ToString();
+            var schemaName = GetScopeInfoSchema;
+            var tableName = GetScopeInfoTableName;
 
             var commandText = $@"
                     DECLARE @minVersion int;
@@ -34,7 +35,7 @@ namespace Dotmim.Sync.SqlServer.ChangeTracking.Builders
                     FROM sys.tables T 
                     WHERE CHANGE_TRACKING_MIN_VALID_VERSION(T.object_id) is not null;
 
-                    MERGE [{tableName}] AS [base] 
+                    MERGE {(string.IsNullOrWhiteSpace(schemaName) ? "" : $"[{schemaName}].")}[{tableName}] AS [base] 
                     USING (
                                SELECT  @sync_scope_name AS sync_scope_name,  
 	                                   @sync_scope_schema AS sync_scope_schema,  

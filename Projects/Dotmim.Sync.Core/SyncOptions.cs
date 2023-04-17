@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Text.RegularExpressions;
 
 namespace Dotmim.Sync
 {
@@ -16,7 +17,9 @@ namespace Dotmim.Sync
     {
 
         private int batchSize;
-        
+        private string distinctSchema;
+        private string scopeInfoTableName;
+
         /// <summary>
         /// Default name if nothing is specified for the scope info table and scope info client table, stored on both side
         /// </summary>
@@ -66,6 +69,23 @@ namespace Dotmim.Sync
         public bool CleanFolder { get; set; }
 
         /// <summary>
+        /// Specify a schema to keep all stored procedures and tables in. Default is empty string which keeps things in the same schema as the tables they relate to.
+        /// </summary>
+        /// <remarks>Schema must be created before running.  Auto-creation might be implimented later.</remarks>
+        public string DistinctSchema
+        {
+            get => distinctSchema; set
+            {
+                distinctSchema = value;
+                var scopeTableName = ScopeInfoTableName ?? DefaultScopeInfoTableName;
+                var tablePart = scopeTableName.Contains(".") ?
+                    scopeTableName.Substring(scopeTableName.LastIndexOf('.') + 1) : scopeTableName;
+                ScopeInfoTableName = string.IsNullOrWhiteSpace(distinctSchema) ?
+                        tablePart : "[" + distinctSchema + "]." + tablePart;
+            }
+        } //TODO: Create schema if it does not exist.
+
+        /// <summary>
         /// Gets or Sets if we should disable constraints before making apply changes 
         /// Default value is false
         /// </summary>
@@ -76,7 +96,23 @@ namespace Dotmim.Sync
         /// <summary>
         /// Gets or Sets the scope_info table name. Default is scope_info
         /// </summary>
-        public string ScopeInfoTableName { get; set; }
+        public string ScopeInfoTableName
+        {
+            get => scopeInfoTableName;
+            set
+            {
+                scopeInfoTableName = value;
+                if (!string.IsNullOrWhiteSpace(distinctSchema) && !string.IsNullOrWhiteSpace(scopeInfoTableName))
+                {
+                    var withSchemaPattern = new Regex(@"^\[?(?<schema>[^\]\.]+)\]?.");
+                    var match = withSchemaPattern.Match(scopeInfoTableName);
+                    if (match.Success && string.Equals(match.Groups["schema"].Value, distinctSchema, StringComparison.InvariantCultureIgnoreCase)) 
+                        return;
+                    if (match.Success) throw new ArgumentOutOfRangeException(nameof(ScopeInfoTableName) + " conflicts with " + nameof(DistinctSchema));
+                    scopeInfoTableName = "["+ distinctSchema + "]." + scopeInfoTableName;
+                }
+            }
+        }
 
         /// <summary>
         /// Gets or Sets the default conflict resolution policy. This value could potentially be ovewritten and replaced by the server

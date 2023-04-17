@@ -179,7 +179,7 @@ namespace Dotmim.Sync
 
                 // tmp scope info
                 var scopeInfo = this.InternalCreateScopeInfo(context.ScopeName);
-                scopeInfo.Setup = new SyncSetup();
+                scopeInfo.Setup = new SyncSetup() { DistinctSchema = Options.DistinctSchema };
                 scopeInfo.Setup.Tables.Add(setupTable);
 
                 var tableBuilder = this.GetTableBuilder(syncTable, scopeInfo);

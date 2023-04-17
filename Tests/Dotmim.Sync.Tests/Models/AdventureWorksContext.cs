@@ -516,7 +516,6 @@ namespace Dotmim.Sync.Tests.Models
 
                 //entity.Property(e => e.ModifiedDate).HasColumnType("datetime");
 
-
                 if (this.ProviderType == ProviderType.Sql)
                     entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getdate())");
                 else if (this.ProviderType == ProviderType.MySql || this.ProviderType == ProviderType.MariaDB)
@@ -594,6 +593,8 @@ namespace Dotmim.Sync.Tests.Models
             {
                 if (this.useSchema)
                     entity.ToTable("SalesOrderHeader", "SalesLT");
+                if (this.ProviderType== ProviderType.Sql)
+                    entity.Property(e => e.Comment).HasColumnType("ntext");
 
                 entity.HasKey(e => e.SalesOrderId);
 
@@ -612,7 +613,6 @@ namespace Dotmim.Sync.Tests.Models
                     .IsUnicode(false);
 
                 entity.Property(e => e.CustomerId).HasColumnName("CustomerID");
-
 
                 //entity.Property(e => e.DueDate).HasColumnType("datetime");
 
