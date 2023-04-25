@@ -84,6 +84,17 @@ namespace Dotmim.Sync
         }
 
         /// <summary>
+        /// Get the value in the array that correspond to the column name given, null if the column does not exist
+        /// </summary>
+        public object GetIfAvailable(string columnName)
+        {
+            var column = this.SchemaTable.Columns[columnName];
+            if (column == null)
+                return null;
+            var index = this.SchemaTable.Columns.IndexOf(column);
+            return this[index];
+        }
+        /// <summary>
         /// Get the value in the array that correspond to the SchemaColumn instance given
         /// </summary>
         public object this[SyncColumn column] => this[column.ColumnName];

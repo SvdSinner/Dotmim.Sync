@@ -121,7 +121,7 @@ namespace Dotmim.Sync
 
             if (!tmpScopeInfoClientExists && existsCScopeInfoClient)
             {
-                await dbBuilder.RenameTableAsync(cScopeInfoClientTableName, null, tmpCScopeInfoClientTableName, null,
+                await dbBuilder.RenameTableAsync(cScopeInfoClientTableName, parsedName.SchemaName, tmpCScopeInfoClientTableName, parsedName.SchemaName,
                     runner.Connection, runner.Transaction).ConfigureAwait(false);
 
                 message = $"- Temporary renamed {cScopeInfoClientTableName} to {tmpCScopeInfoClientTableName}.";
@@ -163,7 +163,7 @@ namespace Dotmim.Sync
             var parsedName = ParserName.Parse(this.Options.ScopeInfoTableName);
             var cScopeInfoTableName = $"{parsedName.Unquoted().Normalized()}";
             var cScopeInfoClientTableName = $"{parsedName.Unquoted().Normalized()}_client";
-            var tmpCScopeInfoTableName = $"tmp{cScopeInfoTableName}";
+            var tmpCScopeInfoTableName = $"tmp{parsedName.Unquoted().Normalized()}";
             var message = "";
 
             // Initialize database if needed
@@ -175,12 +175,12 @@ namespace Dotmim.Sync
             var tmpScopeInfoExists = await dbBuilder.ExistsTableAsync(tmpCScopeInfoTableName, null,
                 runner.Connection, runner.Transaction).ConfigureAwait(false);
 
-            var existsCScopeInfo = await dbBuilder.ExistsTableAsync(cScopeInfoTableName, null,
+            var existsCScopeInfo = await dbBuilder.ExistsTableAsync(cScopeInfoTableName, parsedName.SchemaName,
                 runner.Connection, runner.Transaction).ConfigureAwait(false);
 
             if (!tmpScopeInfoExists && existsCScopeInfo)
             {
-                await dbBuilder.RenameTableAsync(cScopeInfoTableName, null, tmpCScopeInfoTableName, null,
+                await dbBuilder.RenameTableAsync(cScopeInfoTableName, parsedName.SchemaName, tmpCScopeInfoTableName, parsedName.SchemaName,
                     runner.Connection, runner.Transaction).ConfigureAwait(false);
 
                 message = $"- Temporary renamed {cScopeInfoTableName} to {tmpCScopeInfoTableName}.";
@@ -190,17 +190,18 @@ namespace Dotmim.Sync
             // ----------------------------------------------------
             // Step 2 : Create scope_info 
             // ----------------------------------------------------
-            existsCScopeInfo = await dbBuilder.ExistsTableAsync(cScopeInfoTableName, null,
+            var pScopeInfo = parsedName.Schema();
+            existsCScopeInfo = await dbBuilder.ExistsTableAsync(pScopeInfo.ObjectName, pScopeInfo.SchemaName,
                 runner.Connection, runner.Transaction).ConfigureAwait(false);
 
             if (!existsCScopeInfo)
                 (context, _) = await this.InternalCreateScopeInfoTableAsync(context, DbScopeType.ScopeInfo,
                     runner.Connection, runner.Transaction, runner.CancellationToken, runner.Progress).ConfigureAwait(false);
 
-            message = $"- Created new version of {cScopeInfoTableName} table.";
+            message = $"- Created new version of {(string.IsNullOrEmpty(parsedName.SchemaName) ? cScopeInfoTableName : $"{parsedName.SchemaName}.{cScopeInfoTableName}")} table.";
             await this.InterceptAsync(new UpgradeProgressArgs(context, message, SyncVersion.Current, runner.Connection, runner.Transaction), runner.Progress).ConfigureAwait(false);
 
-            var oldScopeInfotable = await dbBuilder.GetTableAsync(tmpCScopeInfoTableName, null, runner.Connection, runner.Transaction).ConfigureAwait(false);
+            var oldScopeInfotable = await dbBuilder.GetTableAsync(tmpCScopeInfoTableName, parsedName.SchemaName, runner.Connection, runner.Transaction).ConfigureAwait(false);
 
             return oldScopeInfotable;
         }

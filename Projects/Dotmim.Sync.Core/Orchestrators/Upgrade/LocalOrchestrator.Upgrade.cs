@@ -104,7 +104,8 @@ namespace Dotmim.Sync
             var dbBuilder = this.Provider.GetDatabaseBuilder();
 
             // get the scope info lines
-            var scopeInfos = await dbBuilder.GetTableAsync(this.Options.ScopeInfoTableName, default,
+            var pScopeInfo = ParserName.Parse(this.Options.ScopeInfoTableName);
+            var scopeInfos = await dbBuilder.GetTableAsync(pScopeInfo.ObjectName, pScopeInfo.SchemaName,
                 runner.Connection, runner.Transaction).ConfigureAwait(false);
 
             // if empty, no need to upgrade
@@ -210,15 +211,20 @@ namespace Dotmim.Sync
                     runner.Progress, runner.CancellationToken).ConfigureAwait(false);
 
                 // Create scope info client
+                var lastSyncDuration = (long)(scopeInfoRow.GetIfAvailable("scope_last_sync_duration")??0L);
+                var lastSync = (DateTime)(scopeInfoRow.GetIfAvailable("scope_last_sync")?? new DateTime(1900,1,1));
+                var lastServerSyncTimestamp = (long)(scopeInfoRow.GetIfAvailable("scope_last_server_sync_timestamp")??0L);
+                var lastSyncTimestamp = (long)(scopeInfoRow.GetIfAvailable("scope_last_sync_timestamp")??0L);
+
                 var cScopeInfoClient = new ScopeInfoClient
                 {
                     Id = scope_info_client_id.Value,
                     Name = scopeName,
-                    LastSyncDuration = (long)scopeInfoRow["scope_last_sync_duration"],
-                    LastSync = (DateTime)scopeInfoRow["scope_last_sync"],
+                    LastSyncDuration = lastSyncDuration,
+                    LastSync = lastSync,
                     Hash = SyncParameters.DefaultScopeHash, // as we see that we don't have any parameters
-                    LastServerSyncTimestamp = (long)scopeInfoRow["scope_last_server_sync_timestamp"],
-                    LastSyncTimestamp = (long)scopeInfoRow["scope_last_sync_timestamp"],
+                    LastServerSyncTimestamp = lastServerSyncTimestamp,
+                    LastSyncTimestamp = lastSyncTimestamp,
                 };
 
                 await this.InternalSaveScopeInfoClientAsync(cScopeInfoClient, context,

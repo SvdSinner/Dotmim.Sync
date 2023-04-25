@@ -116,7 +116,7 @@ namespace Dotmim.Sync.SqlServer
             var pSchemaName = ParserName.Parse(schemaName);
 
             var name = $"{pTableName.Quoted()}";
-            var sName = String.IsNullOrEmpty(schemaName) ? "[dbo]" : $"{pSchemaName.Quoted()}";
+            var sName = String.IsNullOrEmpty(schemaName) ? (String.IsNullOrEmpty(pTableName.SchemaName) ? "[dbo]" : pTableName.SchemaName)  : $"{pSchemaName.Quoted()}";
 
             var command = $"Select * from {sName}.{name};";
 
@@ -148,12 +148,37 @@ namespace Dotmim.Sync.SqlServer
             var pNewTableName = ParserName.Parse(newTableName).Unquoted().ToString(); 
             var pNewSchemaName = ParserName.Parse(newSchemaName).Unquoted().ToString();
 
-            var quotedTableName = string.IsNullOrEmpty(pSchemaName) ? pTableName : $"{pSchemaName}.{pTableName}";
-            var quotedNewTableName = string.IsNullOrEmpty(pNewSchemaName) ? pNewTableName : $"{pNewSchemaName}.{pNewTableName}";
-
-            var commandText = $"exec sp_rename '{quotedTableName}', '{quotedNewTableName}';";
-
+            if (string.IsNullOrEmpty(pSchemaName) && string.IsNullOrEmpty(pNewSchemaName) && pSchemaName != pNewSchemaName)
+                throw new Exception("Cannot rename tables into a different schema");//
+            var commandText = //$"exec sp_rename '{quotedTableName}', '{quotedNewTableName}';";
+                $"DECLARE --@tablename sysname = '{pTableName}', @schemaname sysname = '{pSchemaName}', @newTableName sysname = '{pNewTableName}', \r\n" +
+                //TODO:Clean this up if it works.
+                @"      @sql nvarchar(MAX) ='', @childname sysname, @childSchema sysname;
+--Get schema if not provided
+IF LEN(ISNULL(@schemaname, '')) = 0
+	SELECT @schemaname = SCHEMA_NAME(t.schema_id) FROM sys.tables t WHERE t.name = @tablename;
+DECLARE childrenToRename CURSOR FOR 
+SELECT o.name ObjName, s.name SchemaName
+FROM sys.objects o INNER JOIN sys.schemas s ON s.schema_id = o.schema_id INNER JOIN sys.tables t ON t.object_id =o.parent_object_id
+WHERE @tablename = OBJECT_NAME(o.parent_object_id) AND SCHEMA_NAME(t.schema_id) = @schemaname
+OPEN childrenToRename;
+FETCH NEXT FROM childrenToRename INTO @childname, @childSchema;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	DECLARE @fullChildName NVARCHAR(256) = '['+@childSchema+'].['+ @childname + ']';
+	DECLARE @newName sysname = REPLACE(@childname, @tablename, @newTableName);
+	PRINT ('Renaming child: ' + @fullChildName + ' to: '+ @newName);
+	EXEC sp_rename @fullChildName, @newName;
+	FETCH NEXT FROM childrenToRename INTO @childname, @childSchema;
+END
+CLOSE childrenToRename;
+DEALLOCATE childrenToRename;
+DECLARE @fullName NVARCHAR(256) = '['+@schemaname+'].['+ @tablename + ']';
+EXEC sp_rename @fullName, @newTableName;";
             using var sqlCommand = new SqlCommand(commandText, connection);
+            sqlCommand.Parameters.Add(new SqlParameter("@tableName", SqlDbType.NVarChar, 128) { Value = pTableName });
+            sqlCommand.Parameters.Add(new SqlParameter("@schemaname", SqlDbType.NVarChar, 128) { Value = pSchemaName });
+            sqlCommand.Parameters.Add(new SqlParameter("@newTableName", SqlDbType.NVarChar, 128) { Value = pNewTableName });
 
             bool alreadyOpened = connection.State == ConnectionState.Open;
 
